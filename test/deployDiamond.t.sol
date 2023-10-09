@@ -5,6 +5,8 @@ import "../contracts/interfaces/IDiamondCut.sol";
 import "../contracts/facets/DiamondCutFacet.sol";
 import "../contracts/facets/DiamondLoupeFacet.sol";
 import "../contracts/facets/OwnershipFacet.sol";
+import "../contracts/facets/ERC20Facet.sol";
+
 import "forge-std/Test.sol";
 import "../contracts/Diamond.sol";
 
@@ -14,18 +16,20 @@ contract DiamondDeployer is Test, IDiamondCut {
     DiamondCutFacet dCutFacet;
     DiamondLoupeFacet dLoupe;
     OwnershipFacet ownerF;
+    ERC20 erc20F;
 
     function testDeployDiamond() public {
         //deploy facets
         dCutFacet = new DiamondCutFacet();
-        diamond = new Diamond(address(this), address(dCutFacet));
+        diamond = new Diamond(address(this), address(dCutFacet), "JayToken", "JAY", 18);
         dLoupe = new DiamondLoupeFacet();
         ownerF = new OwnershipFacet();
+        erc20F = new ERC20();
 
         //upgrade diamond with facets
 
         //build cut struct
-        FacetCut[] memory cut = new FacetCut[](2);
+        FacetCut[] memory cut = new FacetCut[](3);
 
         cut[0] = (
             FacetCut({
@@ -43,6 +47,14 @@ contract DiamondDeployer is Test, IDiamondCut {
             })
         );
 
+        cut[2] = (
+            FacetCut({
+                facetAddress: address(erc20F),
+                action: FacetCutAction.Add,
+                functionSelectors: generateSelectors("ERC20")
+            })
+        );
+
         //upgrade diamond
         IDiamondCut(address(diamond)).diamondCut(cut, address(0x0), "");
 
@@ -50,9 +62,7 @@ contract DiamondDeployer is Test, IDiamondCut {
         DiamondLoupeFacet(address(diamond)).facetAddresses();
     }
 
-    function generateSelectors(
-        string memory _facetName
-    ) internal returns (bytes4[] memory selectors) {
+    function generateSelectors(string memory _facetName) internal returns (bytes4[] memory selectors) {
         string[] memory cmd = new string[](3);
         cmd[0] = "node";
         cmd[1] = "scripts/genSelectors.js";
@@ -61,9 +71,5 @@ contract DiamondDeployer is Test, IDiamondCut {
         selectors = abi.decode(res, (bytes4[]));
     }
 
-    function diamondCut(
-        FacetCut[] calldata _diamondCut,
-        address _init,
-        bytes calldata _calldata
-    ) external override {}
+    function diamondCut(FacetCut[] calldata _diamondCut, address _init, bytes calldata _calldata) external override {}
 }
